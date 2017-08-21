@@ -29,7 +29,7 @@ namespace iRestrict
 
             var options = GetOptions();
             var now = DateTime.Now;
-            bool isMetered = now.Hour < options.StartTime || now.Hour > options.EndTime;
+            bool isMetered = now.Hour < options.StartTime || now.Hour >= options.EndTime;
             SetMetered(options.Profiles, isMetered);
         }
 
@@ -55,9 +55,28 @@ namespace iRestrict
         private static void SetMetered(string[] profiles, bool isMetered)
         {
             // Get all profiles
-            for (int i = profiles.Length - 1; i >= 0; i--)
+            using (var eventLog = new EventLog("Application"))
             {
-                Console.WriteLine(ExecNetSh($"wlan set profileparameter name={profiles[i]} cost={(isMetered ? "Fixed" : "Unrestricted")}"));
+                eventLog.Source = "Application";
+
+                if (profiles.Length == 0)
+                {
+                    eventLog.WriteEntry(
+                        "No WiFi Profiles have been specified. Aborting...",
+                        EventLogEntryType.Error
+                    );
+                    return;
+                }
+
+                for (int i = profiles.Length - 1; i >= 0; i--)
+                {
+                    eventLog.WriteEntry(
+                        ExecNetSh($"wlan set profileparameter name={profiles[i]} cost={(isMetered ? "Fixed" : "Unrestricted")}"),
+                        EventLogEntryType.Information,
+                        101,
+                        1
+                    );
+                }
             }
         }
 
